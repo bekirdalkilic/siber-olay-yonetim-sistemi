@@ -1,0 +1,5 @@
+Nov 21 10:15:01 demo-host sshd[2101]: Failed password for invalid user admin from 203.0.113.5 port 40222 ssh2
+Nov 21 10:15:03 demo-host sshd[2101]: Failed password for root from 203.0.113.5 port 40224 ssh2
+
+Nov 21 10:15:09 demo-host sshd[2105]: Accepted password for deneme from 198.51.100.7 port 51000 ssh2
+Nov 21 10:15:12 demo-host sshd[2110]: Failed password for root from 203.0.113.5 port 40230 ssh2
