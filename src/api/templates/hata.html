@@ -1,0 +1,15 @@
+{% extends "temel.html" %}
+{% block baslik %}{{ baslik }}{% endblock %}
+{% block icerik %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="card shadow-sm border-danger">
+      <div class="card-body p-4">
+        <h1 class="h4 text-danger">{{ baslik }}</h1>
+        <p class="mb-4">{{ mesaj }}</p>
+        <a class="btn btn-outline-secondary" href="{{ geri_url }}">Geri dön</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

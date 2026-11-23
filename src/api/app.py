@@ -1,13 +1,15 @@
 import json
+from datetime import timedelta
 
 import psycopg
 from flask import Flask, request
 from werkzeug.exceptions import HTTPException
 
 from src.api.auth import api_anahtari_gecerli_mi
-from src.api.config import ortamdan_ayarlari_oku
+from src.api.config import ortamdan_ayarlari_oku, web_ayarlarini_oku
 from src.api.db import olay_isle
 from src.api.validation import olay_dogrula
+from src.api.web import web
 
 
 def hata_yaniti(durum_kodu, hata, mesaj, alanlar=None):
@@ -32,10 +34,28 @@ def create_app(test_ayarlari=None):
     """
     app = Flask(__name__)
 
+    # Oturum çerezi varsayılanları (aşağıdaki ayarlar bunların üzerine yazabilir):
+    # SameSite=Lax: başka sitelerden gelen POST isteklerinde çerez gönderilmez.
+    # 30 dakika: her istekte yenilenir, yani hareketsizlikte oturum biter.
+    app.config.update(
+        SESSION_COOKIE_SAMESITE="Lax",
+        PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
+    )
+
     if test_ayarlari is None:
         app.config.from_mapping(ortamdan_ayarlari_oku())
+        app.config.from_mapping(web_ayarlarini_oku())
+        if not app.config.get("SECRET_KEY"):
+            app.logger.warning(
+                "SECRET_KEY tanımlı değil: web arayüzü (giriş sayfaları) kapalı. "
+                "Olay API'si çalışmaya devam ediyor."
+            )
     else:
         app.config.from_mapping(test_ayarlari)
+
+    # Oturum imzalamak için SECRET_KEY şart; yoksa giriş sayfaları hiç eklenmez.
+    if app.config.get("SECRET_KEY"):
+        app.register_blueprint(web)
 
     @app.get("/health")
     def health():

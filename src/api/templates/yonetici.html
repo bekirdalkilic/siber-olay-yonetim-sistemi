@@ -1,0 +1,14 @@
+{% extends "temel.html" %}
+{% block baslik %}Yönetici paneli{% endblock %}
+{% block icerik %}
+<div class="card shadow-sm">
+  <div class="card-body p-4">
+    <h1 class="h3">Yönetici paneli</h1>
+    <p class="lead mb-3">Hoş geldiniz, <strong>{{ kullanici.kullanici_adi }}</strong>.</p>
+    <p class="text-body-secondary mb-0">
+      Bu sayfayı yalnızca yönetici yetkisine (yetki = 1) sahip kullanıcılar görebilir.
+      Olay takibi ve kullanıcı yönetimi sonraki aşamalarda eklenecek.
+    </p>
+  </div>
+</div>
+{% endblock %}

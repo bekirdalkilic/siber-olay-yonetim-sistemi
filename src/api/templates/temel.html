@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block baslik %}Giriş{% endblock %} · Olay Yönetimi</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+</head>
+<body class="bg-body-tertiary">
+  {% if kullanici %}
+  <nav class="navbar bg-dark" data-bs-theme="dark">
+    <div class="container">
+      <span class="navbar-brand mb-0 h1">Güvenlik Duvarı Olay Yönetimi</span>
+      <div class="d-flex align-items-center gap-3">
+        <span class="navbar-text">
+          {{ kullanici.kullanici_adi }}
+          <span class="badge text-bg-secondary">{{ "Yönetici" if kullanici.yetki == 1 else "Analist" }}</span>
+        </span>
+        <form method="post" action="{{ url_for('web.cikis') }}" class="m-0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-light btn-sm">Çıkış yap</button>
+        </form>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+  <main class="container py-5">
+    {% block icerik %}{% endblock %}
+  </main>
+</body>
+</html>
