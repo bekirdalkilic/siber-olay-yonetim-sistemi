@@ -129,10 +129,11 @@ def main(argv=None, ortam=None):
     ortam = os.environ if ortam is None else ortam
     args = argumanlari_oku(argv, ortam)
     api_anahtari = ortam.get("API_KEY", "")
+    cihaz_adi = (args.cihaz_adi or "").strip()  # boşlukları at; verilmediyse ""
 
     try:
         saat_dilimi = zaman_dilimi_coz(args.saat_dilimi)
-        if not (args.cihaz_adi or "").strip():
+        if not cihaz_adi:
             raise AjanHatasi("Cihaz adı verilmedi (--cihaz-adi ya da CIHAZ_ADI).")
         if not args.kuru_calistirma and not api_anahtari.strip():
             raise AjanHatasi("API_KEY ortam değişkeni tanımlı değil.")
@@ -147,7 +148,7 @@ def main(argv=None, ortam=None):
     print(f"{len(alarmlar)} SSH brute-force alarmı bulundu ({args.log})")
     hatali = 0
     for sira, alarm in enumerate(alarmlar, start=1):
-        olay = alarmi_olaya_cevir(alarm, args.cihaz_adi.strip(), saat_dilimi)
+        olay = alarmi_olaya_cevir(alarm, cihaz_adi, saat_dilimi)
         ozet = f"[{sira}] {olay['kaynak_ip']} ({alarm['deneme_sayisi']} deneme)"
         if args.kuru_calistirma:
             print(f"{ozet} gönderilmedi: {json.dumps(olay, ensure_ascii=False)}")

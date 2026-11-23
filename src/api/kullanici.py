@@ -97,13 +97,14 @@ def giris_dene(cur, kullanici_adi, parola, simdi):
     cur.execute(GIRIS_SORGUSU, (kullanici_adi,))
     satir = cur.fetchone()
 
-    # Her durumda bir Argon2 doğrulaması yapılır (kullanıcı yoksa sahte hash'e karşı).
-    parola_hash = _SAHTE_HASH if satir is None else satir[2]
-    dogru = parola_dogru_mu(parola_hash, parola)
     if satir is None:
+        # Kullanıcı yok. Yine de bir Argon2 doğrulaması yapılır (sahte hash'e karşı);
+        # böylece cevap süresine bakarak "bu kullanıcı var mı" anlaşılamaz.
+        parola_dogru_mu(_SAHTE_HASH, parola)
         return None
 
-    kullanici_id, ad, _hash, yetki, aktif_mi, hatali_giris, kilit_bitis = satir
+    kullanici_id, ad, parola_hash, yetki, aktif_mi, hatali_giris, kilit_bitis = satir
+    dogru = parola_dogru_mu(parola_hash, parola)
     basarili, yeni_sayi, yeni_kilit = giris_sonucu_hesapla(
         hatali_giris, kilit_bitis, aktif_mi, dogru, simdi
     )
@@ -136,9 +137,7 @@ def kullanici_getir(database_url, kullanici_id):
     eski oturum hemen geçersiz olur.
     """
     with psycopg.connect(database_url, connect_timeout=5) as conn:
-        with conn.cursor() as cur:
-            cur.execute(KULLANICI_GETIR, (kullanici_id,))
-            satir = cur.fetchone()
+        satir = conn.execute(KULLANICI_GETIR, (kullanici_id,)).fetchone()
     if satir is None:
         return None
     return {"id": satir[0], "kullanici_adi": satir[1], "yetki": satir[2]}
