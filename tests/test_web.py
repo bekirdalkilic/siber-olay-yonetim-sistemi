@@ -5,6 +5,7 @@ import re
 
 import psycopg
 import pytest
+from flask import render_template
 
 from src.api.app import create_app
 from src.api.config import AyarHatasi, web_ayarlarini_oku
@@ -171,27 +172,58 @@ def test_yonetici_girisi_yonetici_sayfasina_gider(istemci):
     sayfa = istemci.get("/yonetici")
     assert sayfa.status_code == 200
     govde = sayfa.get_data(as_text=True)
-    assert "Yönetici paneli" in govde and "yonetici1" in govde and "Çıkış yap" in govde
+    assert "Yönetici Paneli" in govde and "yonetici1" in govde and "Çıkış yap" in govde
 
 
 def test_analist_girisi_analist_sayfasina_gider(istemci):
     yanit = giris_yap(istemci, "analist1", PAROLALAR["analist1"])
     assert yanit.status_code == 302 and yanit.headers["Location"].endswith("/analist")
-    assert "Analist paneli" in istemci.get("/analist").get_data(as_text=True)
+    assert "Analist Paneli" in istemci.get("/analist").get_data(as_text=True)
 
 
-def test_analist_yonetici_sayfasini_acarsa_403(istemci):
+def test_analist_yonetici_sayfasini_acarsa_kendi_sayfasina_302(istemci):
     giris_yap(istemci, "analist1", PAROLALAR["analist1"])
     yanit = istemci.get("/yonetici")
+    assert yanit.status_code == 302 and yanit.headers["Location"].endswith("/analist")
+
+
+# yonetici.html'de olup analist.html'de OLMAYAN metinler: analiste sızarsa test yakalar.
+YONETICI_SAYFASINA_OZGU = ("Yönetici Paneli", "Kullanıcı hesaplarını yönetme", "Kayıtlı cihazları görüntüleme")
+
+
+def test_analiste_yonetici_sayfasi_ve_verisi_hic_gonderilmez(istemci):
+    giris_yap(istemci, "analist1", PAROLALAR["analist1"])
+    # Yönlendirme yanıtının kendisinde yönetici sayfasından hiçbir şey olmamalı.
+    yanit = istemci.get("/yonetici")
     govde = yanit.get_data(as_text=True)
-    assert yanit.status_code == 403
-    assert "Erişim reddedildi" in govde
-    assert "Yönetici paneli" not in govde and "Hoş geldiniz" not in govde
+    for yonetici_metni in YONETICI_SAYFASINA_OZGU + ("yonetici1", "Hoş geldiniz"):
+        assert yonetici_metni not in govde
+    # Yönlendirmeyi izleyince de analist sayfası gelir, yönetici sayfası değil.
+    sayfa = istemci.get("/yonetici", follow_redirects=True)
+    govde = sayfa.get_data(as_text=True)
+    assert sayfa.status_code == 200 and "Analist Paneli" in govde and "analist1" in govde
+    for yonetici_metni in YONETICI_SAYFASINA_OZGU + ("yonetici1",):
+        assert yonetici_metni not in govde
 
 
-def test_yonetici_analist_sayfasini_da_acabilir(istemci):
+def test_analist_yonetici_sayfasi_hic_olusturulmaz(istemci, monkeypatch):
+    """Şablon hiç çizilmemeli: yönetici şablonu çizilirse test patlar."""
+    giris_yap(istemci, "analist1", PAROLALAR["analist1"])
+    cizilenler = []
+    gercek = render_template
+    monkeypatch.setattr("src.api.web.render_template",
+                        lambda ad, **kw: cizilenler.append(ad) or gercek(ad, **kw))
+    istemci.get("/yonetici")
+    assert "yonetici.html" not in cizilenler
+
+
+def test_yonetici_analist_sayfasina_girerse_yonetici_sayfasina_302(istemci):
     giris_yap(istemci, "yonetici1", PAROLALAR["yonetici1"])
-    assert istemci.get("/analist").status_code == 200
+    yanit = istemci.get("/analist")
+    assert yanit.status_code == 302 and yanit.headers["Location"].endswith("/yonetici")
+    assert "Analist Paneli" not in yanit.get_data(as_text=True)   # analist sayfası çizilmedi
+    sayfa = istemci.get("/analist", follow_redirects=True)
+    assert sayfa.status_code == 200 and "Yönetici Paneli" in sayfa.get_data(as_text=True)
 
 
 @pytest.mark.parametrize("adres", ["/yonetici", "/analist"])
@@ -204,7 +236,8 @@ def test_yetki_dogrulugu_cerezden_degil_veritabanindan_gelir(istemci, kullanicil
     giris_yap(istemci, "yonetici1", PAROLALAR["yonetici1"])
     assert istemci.get("/yonetici").status_code == 200
     kullanicilar.tablo[1]["yetki"] = 0        # yönetici yetkisi sonradan alındı
-    assert istemci.get("/yonetici").status_code == 403
+    yanit = istemci.get("/yonetici")
+    assert yanit.status_code == 302 and yanit.headers["Location"].endswith("/analist")
 
 
 def test_pasiflestirilen_kullanicinin_oturumu_gecersiz_olur(istemci, kullanicilar):
@@ -221,6 +254,52 @@ def test_next_parametresiyle_acik_yonlendirme_yok(istemci):
                       query_string={"next": "http://kotu-site.example/"})
     assert yanit.headers["Location"].endswith("/yonetici")
     assert "kotu-site" not in yanit.headers["Location"]
+
+
+# ---------- oturum açıkken /giris ----------
+
+@pytest.mark.parametrize("kullanici_adi, beklenen", [("yonetici1", "/yonetici"), ("analist1", "/analist")])
+def test_oturum_aciksa_giris_formu_gosterilmez_rol_sayfasina_yonlenir(istemci, kullanici_adi, beklenen):
+    giris_yap(istemci, kullanici_adi, PAROLALAR[kullanici_adi])
+    yanit = istemci.get("/giris")
+    assert yanit.status_code == 302 and yanit.headers["Location"].endswith(beklenen)
+    assert "<form" not in yanit.get_data(as_text=True)
+
+
+def test_oturum_yoksa_giris_formu_gosterilir(istemci):
+    yanit = istemci.get("/giris")
+    assert yanit.status_code == 200 and 'name="parola"' in yanit.get_data(as_text=True)
+
+
+def test_giris_yonlendirmesi_guncel_rolu_veritabanindan_okur(istemci, kullanicilar):
+    giris_yap(istemci, "yonetici1", PAROLALAR["yonetici1"])
+    kullanicilar.tablo[1]["yetki"] = 0        # rol sonradan değişti, çerezde eski bilgi yok
+    assert istemci.get("/giris").headers["Location"].endswith("/analist")
+
+
+def test_silinen_kullanicinin_oturumu_giriste_temizlenir_ve_form_gelir(istemci, kullanicilar):
+    giris_yap(istemci, "analist1", PAROLALAR["analist1"])
+    del kullanicilar.tablo[2]
+    yanit = istemci.get("/giris")
+    assert yanit.status_code == 200 and 'name="parola"' in yanit.get_data(as_text=True)
+    with istemci.session_transaction() as oturum:
+        assert "kullanici_id" not in oturum
+
+
+def test_giris_yonlendirmesinde_acik_yonlendirme_yok(istemci):
+    giris_yap(istemci, "yonetici1", PAROLALAR["yonetici1"])
+    for sorgu in ({"next": "http://kotu-site.example/"}, {"url": "//kotu-site.example"}, {"yonlendir": "/yonetici"}):
+        yanit = istemci.get("/giris", query_string=sorgu)
+        assert yanit.status_code == 302 and yanit.headers["Location"] == "/yonetici"
+
+
+def test_oturum_acikken_giriste_veritabani_hatasi_503(istemci, monkeypatch):
+    giris_yap(istemci, "yonetici1", PAROLALAR["yonetici1"])
+    def patlat(*a):
+        raise psycopg.OperationalError(SIR)
+    monkeypatch.setattr("src.api.web.kullanici_getir", patlat)
+    yanit = istemci.get("/giris")
+    assert yanit.status_code == 503 and "cok-gizli-sifre" not in yanit.get_data(as_text=True)
 
 
 # ---------- oturum ----------

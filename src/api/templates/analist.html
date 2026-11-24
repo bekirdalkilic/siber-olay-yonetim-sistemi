@@ -1,14 +1,33 @@
+
 {% extends "temel.html" %}
-{% block baslik %}Analist paneli{% endblock %}
+{% block baslik %}Analist Paneli{% endblock %}
+
 {% block icerik %}
 <div class="card shadow-sm">
-  <div class="card-body p-4">
-    <h1 class="h3">Analist paneli</h1>
-    <p class="lead mb-3">Hoş geldiniz, <strong>{{ kullanici.kullanici_adi }}</strong>.</p>
-    <p class="text-body-secondary mb-0">
-      Bu sayfayı analist (yetki = 0) ve yönetici (yetki = 1) kullanıcılar görebilir.
-      Olay izleme ekranı sonraki aşamalarda eklenecek.
-    </p>
-  </div>
+    <div class="card-body p-4">
+        <h1 class="h3">Analist Paneli</h1>
+
+        <p>Hoş geldiniz, <strong>{{ kullanici.kullanici_adi }}</strong>.</p>
+
+        <p>
+            Bu panel, sistemde tespit edilen güvenlik
+            olaylarını incelemek amacıyla hazırlanmıştır.
+        </p>
+
+        <h2 class="h5">Planlanan İşlemler</h2>
+
+        <ul>
+            <li>Güvenlik olaylarını görüntüleme</li>
+            <li>Olay detaylarını inceleme</li>
+            <li>Olayların durumunu takip etme</li>
+        </ul>
+
+        <p>
+            <small>
+                Olay listeleme ve takip özellikleri
+                henüz geliştirme aşamasındadır.
+            </small>
+        </p>
+    </div>
 </div>
 {% endblock %}

@@ -1,7 +1,6 @@
 """Web arayüzü: giriş, çıkış ve rol bazlı sayfalar (Flask Blueprint).
 
-Akış: /giris (form) -> CSRF kontrolü -> kullanici.giris_isle -> oturum -> /yonetici ya da /analist
-Yetki: yetki=1 yönetici, yetki=0 analist. Korumalı sayfalarda yetkili_kullaniciyi_getir kullanılır.
+Akış: /giris -> CSRF kontrolü -> giris_isle -> oturum -> /yonetici (yetki=1) ya da /analist (yetki=0)
 """
 import hmac
 import secrets
@@ -16,24 +15,23 @@ web = Blueprint("web", __name__)
 ANALIST = 0
 YONETICI = 1
 
-# Kullanıcı yok / parola yanlış / hesap kilitli / hesap pasif: HEPSİNDE aynı mesaj.
-# Farklı mesajlar saldırgana hangi kullanıcı adlarının var olduğunu söylerdi.
+# Her başarısızlıkta AYNI mesaj: farklı mesajlar hangi kullanıcı adlarının var olduğunu sızdırırdı.
 GENEL_GIRIS_HATASI = "Kullanıcı adı veya parola hatalı ya da hesap geçici olarak kilitli."
 
 
 # ---------- CSRF ----------
-# CSRF: başka bir sitenin, tarayıcındaki açık oturumu kullanarak senin adına form
-# göndermesi. Önlem: her formda oturuma özel gizli bir token olur; başka site bunu bilemez.
+# CSRF: başka bir sitenin, açık oturumunu kullanarak senin adına form göndermesi.
+# Önlem: her formda oturuma özel gizli bir token olur; başka site bunu bilemez.
 
 def csrf_token():
-    """Oturumdaki CSRF token'ını döndürür (yoksa üretir). Şablonlarda csrf_token() olarak kullanılır."""
+    """Oturumdaki CSRF token'ını döndürür (yoksa üretir). Şablonlarda da kullanılır."""
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
     return session["csrf_token"]
 
 
 def csrf_gecerli_mi():
-    """Formdan gelen csrf_token, oturumdakiyle aynı mı? (sabit sürede karşılaştırır)"""
+    """Formdan gelen csrf_token oturumdakiyle aynı mı? (sabit sürede karşılaştırır)"""
     beklenen = session.get("csrf_token", "")
     gelen = request.form.get("csrf_token", "")
     if not beklenen:
@@ -49,19 +47,16 @@ def sablon_degiskenleri():
 # ---------- yardımcılar ----------
 
 def rol_sayfasi(yetki):
-    """Yetkiye göre kullanıcının ana sayfasının adresi: yönetici -> /yonetici, analist -> /analist."""
+    """Yetkiye göre ana sayfa: yönetici -> /yonetici, analist -> /analist.
+
+    Yönlendirmeler hep bu sabit adreslerden biridir; dışarıdan gelen adrese asla yönlendirilmez.
+    """
     return url_for("web.yonetici") if yetki == YONETICI else url_for("web.analist")
 
 
-def hata_sayfasi(baslik, mesaj, geri_url, durum, kullanici=None):
-    """hata.html sayfasını verilen HTTP durum koduyla (403, 503 gibi) döndürür.
-
-    baslik, mesaj: sayfada gösterilecek yazılar. geri_url: "Geri dön" bağlantısının adresi.
-    durum: HTTP durum kodu. kullanici: giriş yapmış kullanıcı sözlüğü (menüde adı görünsün diye).
-    """
-    sayfa = render_template(
-        "hata.html", baslik=baslik, mesaj=mesaj, geri_url=geri_url, kullanici=kullanici
-    )
+def hata_sayfasi(baslik, mesaj, geri_url, durum):
+    """hata.html sayfasını verilen HTTP durum koduyla (403, 503 gibi) döndürür."""
+    sayfa = render_template("hata.html", baslik=baslik, mesaj=mesaj, geri_url=geri_url)
     return sayfa, durum
 
 
@@ -79,14 +74,11 @@ def veritabani_hatasi_sayfasi(hata):
 
 
 def yetkili_kullaniciyi_getir(en_az_yetki):
-    """Oturumdaki kullanıcının bu sayfayı açıp açamayacağını kontrol eder.
+    """Oturumdaki kullanıcı bu sayfayı açabilir mi? Döndürür: (kullanici, hata_yaniti).
 
-    en_az_yetki: ANALIST (0) ya da YONETICI (1). Yönetici (1) analist (0) sayfalarını da açabilir.
-    Döndürür: (kullanici, hata_yaniti)
-    - Giriş yapılabilir durumdaysa -> (kullanici sözlüğü, None)
-    - Oturum yoksa            -> (None, /giris'e yönlendirme 302)
-    - Kullanıcı artık yoksa/pasifse -> oturumu siler, (None, /giris'e yönlendirme)
-    - Yetkisi yetmiyorsa      -> (None, 403 Forbidden sayfası)
+    - Açabilirse                    -> (kullanici, None)
+    - Oturum yok / kullanıcı yok    -> (None, /giris'e 302); kullanıcı yoksa oturum da silinir
+    - Yetkisi yetmiyorsa (analist)  -> (None, kendi sayfasına 302)
     Kullanıcı HER istekte veritabanından okunur; çerezdeki bilgiye güvenilmez.
     """
     kullanici_id = session.get("kullanici_id")
@@ -103,14 +95,7 @@ def yetkili_kullaniciyi_getir(en_az_yetki):
         return None, redirect(url_for("web.giris"))
 
     if kullanici["yetki"] < en_az_yetki:
-        yanit = hata_sayfasi(
-            "Erişim reddedildi",
-            "Bu sayfayı görüntüleme yetkiniz yok.",
-            rol_sayfasi(kullanici["yetki"]),
-            403,
-            kullanici,
-        )
-        return None, yanit
+        return None, redirect(rol_sayfasi(kullanici["yetki"]))
 
     return kullanici, None
 
@@ -125,6 +110,16 @@ def ana_sayfa():
 @web.route("/giris", methods=["GET", "POST"])
 def giris():
     if request.method == "GET":
+        # Zaten giriş yapılmışsa formu gösterme: güncel rolü veritabanından okuyup kendi sayfasına yolla.
+        kullanici_id = session.get("kullanici_id")
+        if isinstance(kullanici_id, int) and not isinstance(kullanici_id, bool):
+            try:
+                kullanici = kullanici_getir(current_app.config["DATABASE_URL"], kullanici_id)
+            except psycopg.Error as hata:
+                return veritabani_hatasi_sayfasi(hata)
+            if kullanici is not None:
+                return redirect(rol_sayfasi(kullanici["yetki"]))
+            session.clear()  # kullanıcı artık yok ya da pasif: eski oturumu at
         csrf_token()  # oturumu ve token'ı hazırla
         return render_template("giris.html")
 
@@ -178,18 +173,24 @@ def yonetici():
     return render_template("yonetici.html", kullanici=kullanici)
 
 
+
 @web.get("/analist")
 def analist():
     kullanici, hata = yetkili_kullaniciyi_getir(ANALIST)
+
     if hata is not None:
         return hata
+
+    if kullanici["yetki"] == YONETICI:
+        return redirect(url_for("web.yonetici"))
+
     return render_template("analist.html", kullanici=kullanici)
 
 
 @web.after_request
 def guvenlik_basliklari(yanit):
     # Sadece kendi sitemizden kaynak yükle, sayfa başka sitede çerçevelenmesin,
-    # tarayıcı içerik türünü tahmin etmesin, giriş sayfaları önbelleğe alınmasın.
+    # tarayıcı içerik türünü tahmin etmesin, sayfalar önbelleğe alınmasın.
     yanit.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; form-action 'self'"
     yanit.headers["X-Frame-Options"] = "DENY"
     yanit.headers["X-Content-Type-Options"] = "nosniff"

@@ -1,14 +1,38 @@
+
 {% extends "temel.html" %}
-{% block baslik %}Yönetici paneli{% endblock %}
+{% block baslik %}Yönetici Paneli{% endblock %}
+
 {% block icerik %}
 <div class="card shadow-sm">
-  <div class="card-body p-4">
-    <h1 class="h3">Yönetici paneli</h1>
-    <p class="lead mb-3">Hoş geldiniz, <strong>{{ kullanici.kullanici_adi }}</strong>.</p>
-    <p class="text-body-secondary mb-0">
-      Bu sayfayı yalnızca yönetici yetkisine (yetki = 1) sahip kullanıcılar görebilir.
-      Olay takibi ve kullanıcı yönetimi sonraki aşamalarda eklenecek.
-    </p>
-  </div>
+    <div class="card-body p-4">
+        <h1 class="h3">Yönetici Paneli</h1>
+
+        <p>
+            Hoş geldiniz,
+            <strong>{{ kullanici.kullanici_adi }}</strong>.
+        </p>
+
+        <p>
+            Bu panel, sistemin yönetim işlemlerini
+            gerçekleştirmek ve güvenlik olaylarını
+            takip etmek amacıyla hazırlanmıştır.
+        </p>
+
+        <h2 class="h5">Planlanan İşlemler</h2>
+
+        <ul>
+            <li>Kullanıcı hesaplarını yönetme</li>
+            <li>Kayıtlı cihazları görüntüleme</li>
+            <li>Güvenlik olaylarını inceleme</li>
+            <li>Olay kayıtlarını takip etme</li>
+        </ul>
+
+        <p>
+            <small>
+                Yönetim ve olay takip özellikleri
+                henüz geliştirme aşamasındadır.
+            </small>
+        </p>
+    </div>
 </div>
 {% endblock %}
