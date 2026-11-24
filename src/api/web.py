@@ -47,10 +47,7 @@ def sablon_degiskenleri():
 # ---------- yardımcılar ----------
 
 def rol_sayfasi(yetki):
-    """Yetkiye göre ana sayfa: yönetici -> /yonetici, analist -> /analist.
-
-    Yönlendirmeler hep bu sabit adreslerden biridir; dışarıdan gelen adrese asla yönlendirilmez.
-    """
+    """Rol sayfası: yönetici -> /yonetici, analist -> /analist (hep sabit adres, açık yönlendirme yok)."""
     return url_for("web.yonetici") if yetki == YONETICI else url_for("web.analist")
 
 
@@ -74,11 +71,9 @@ def veritabani_hatasi_sayfasi(hata):
 
 
 def yetkili_kullaniciyi_getir(en_az_yetki):
-    """Oturumdaki kullanıcı bu sayfayı açabilir mi? Döndürür: (kullanici, hata_yaniti).
+    """Kullanıcı bu sayfayı açabilir mi? Açabilirse (kullanici, None), açamazsa (None, hazır yanıt) döner.
 
-    - Açabilirse                    -> (kullanici, None)
-    - Oturum yok / kullanıcı yok    -> (None, /giris'e 302); kullanıcı yoksa oturum da silinir
-    - Yetkisi yetmiyorsa (analist)  -> (None, kendi sayfasına 302)
+    Yanıt: oturum/kullanıcı yoksa /giris'e, yetki yetmiyorsa kendi sayfasına 302; veritabanı hatasında 503.
     Kullanıcı HER istekte veritabanından okunur; çerezdeki bilgiye güvenilmez.
     """
     kullanici_id = session.get("kullanici_id")
@@ -110,7 +105,7 @@ def ana_sayfa():
 @web.route("/giris", methods=["GET", "POST"])
 def giris():
     if request.method == "GET":
-        # Zaten giriş yapılmışsa formu gösterme: güncel rolü veritabanından okuyup kendi sayfasına yolla.
+        # Zaten giriş yapılmışsa formu gösterme; güncel rolüne göre kendi sayfasına yolla.
         kullanici_id = session.get("kullanici_id")
         if isinstance(kullanici_id, int) and not isinstance(kullanici_id, bool):
             try:
@@ -173,24 +168,19 @@ def yonetici():
     return render_template("yonetici.html", kullanici=kullanici)
 
 
-
 @web.get("/analist")
 def analist():
     kullanici, hata = yetkili_kullaniciyi_getir(ANALIST)
-
     if hata is not None:
         return hata
-
-    if kullanici["yetki"] == YONETICI:
+    if kullanici["yetki"] == YONETICI:  # yönetici kendi sayfasına
         return redirect(url_for("web.yonetici"))
-
     return render_template("analist.html", kullanici=kullanici)
 
 
 @web.after_request
 def guvenlik_basliklari(yanit):
-    # Sadece kendi sitemizden kaynak yükle, sayfa başka sitede çerçevelenmesin,
-    # tarayıcı içerik türünü tahmin etmesin, sayfalar önbelleğe alınmasın.
+    # Sadece kendi sitemizden kaynak yükle; çerçevelenme, tür tahmini ve önbelleğe alma kapalı.
     yanit.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; form-action 'self'"
     yanit.headers["X-Frame-Options"] = "DENY"
     yanit.headers["X-Content-Type-Options"] = "nosniff"
